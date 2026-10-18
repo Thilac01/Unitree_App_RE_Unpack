@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Unitree Go2 — 3D Robot Simulator</title>
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #090c13;
+      --panel-bg: rgba(13, 19, 33, 0.78);
+      --panel-border: rgba(0, 240, 255, 0.18);
+      --panel-border-hover: rgba(0, 240, 255, 0.45);
+      --accent: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.35);
+      --amber: #ff9d00;
+      --amber-glow: rgba(255, 157, 0, 0.3);
+      --green: #00ff88;
+      --text: #f0f4fc;
+      --text-muted: #8a9bb8;
+      --card-bg: rgba(255, 255, 255, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      display: block;
+    }
+
+    /* Top Navigation HUD */
+    .top-hud {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      padding: 8px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--amber));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #000;
+      font-size: 16px;
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.8px;
+      color: #fff;
+    }
+
+    .brand-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .top-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .hud-pill {
+      background: var(--panel-bg);
+      padding: 7px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(16px);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Floating Panels */
+    .panel {
+      position: absolute;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      z-index: 10;
+      pointer-events: auto;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .panel:hover {
+      border-color: var(--panel-border-hover);
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-body {
+      padding: 14px 16px;
+    }
+
+    /* Left Panel: Telemetry & Camera */
+    .left-panel {
+      top: 76px;
+      left: 16px;
+      width: 280px;
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .telem-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+
+    .telem-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .telem-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 12px 0 6px 0;
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .btn-cam, .btn-preset {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-cam:hover, .btn-preset:hover {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .btn-cam.active {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(0, 240, 255, 0.1));
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    /* Right Panel: Animations & Models */
+    .right-panel {
+      top: 76px;
+      right: 16px;
+      width: 320px;
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+    }
+
+    .model-select {
+      width: 100%;
+      background: rgba(16, 24, 40, 0.9);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+
+    .model-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .action-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .chip {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.18s ease;
+    }
+
+    .chip:hover {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--accent);
+      color: #fff;
+      transform: scale(1.03);
+    }
+
+    .chip.active {
+      background: linear-gradient(135deg, #00f0ff, #00a2ff);
+      color: #000;
+      font-weight: 700;
+      border-color: #00f0ff;
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      transition: .3s;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: .3s;
+    }
+
+    input:checked + .slider {
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+      background: #000;
+    }
+
+    /* Bottom Control Bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 10px 18px;
+      box-shadow: 0 14px 45px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      pointer-events: auto;
+    }
+
+    .action-btn {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #fff;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--accent), #0099ff);
+      color: #000;
+      border-color: var(--accent);
+      box-shadow: 0 0 18px var(--accent-glow);
+    }
+
+    .action-btn.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px var(--accent-glow);
+    }
+
+    .action-btn.danger {
+      background: linear-gradient(135deg, #ff4444, #cc1111);
+      color: #fff;
+      border-color: #ff5555;
+    }
+
+    /* Joystick Containers */
+    .joystick-zone {
+      position: absolute;
+      bottom: 24px;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.05) 0%, rgba(13, 19, 33, 0.8) 70%);
+      border: 2px dashed rgba(0, 240, 255, 0.25);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+      pointer-events: auto;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .joystick-left {
+      left: 24px;
+    }
+
+    .joystick-right {
+      right: 24px;
+    }
+
+    .joystick-knob {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #00f0ff, #0088cc);
+      box-shadow: 0 0 20px var(--accent-glow), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+      position: absolute;
+      transform: translate(0px, 0px);
+      transition: transform 0.05s ease-out;
+      cursor: grab;
+    }
+
+    .joystick-label {
+      position: absolute;
+      bottom: -22px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    /* Loading Overlay */
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #090c13;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.5s ease;
+    }
+
+    .loader-spinner {
+      width: 60px;
+      height: 60px;
+      border: 3px solid rgba(0, 240, 255, 0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loader-text {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .loader-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .left-panel, .right-panel {
+        display: none;
+      }
+      .joystick-zone {
+        width: 110px;
+        height: 110px;
+      }
+      .joystick-knob {
+        width: 42px;
+        height: 42px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Loading Screen -->
+  <div id="loading-overlay">
+    <div class="loader-spinner"></div>
+    <div class="loader-text" id="loader-title">INITIALIZING SIMULATOR</div>
+    <div class="loader-sub" id="loader-progress">Loading Unitree Go2 3D Model...</div>
+  </div>
+
+  <!-- Top HUD Bar -->
+  <header class="top-hud">
+    <div class="brand-group">
+      <div class="brand-logo">U</div>
+      <div>
+        <div class="brand-title">UNITREE GO2</div>
+        <div style="font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px;">BIONIC QUADRUPED ROBOT</div>
+      </div>
+      <div class="brand-badge">SIM V2.0</div>
+    </div>
+
+    <div class="top-stats">
+      <div class="hud-pill">
+        <span class="status-dot"></span>
+        <span id="stat-status">SIMULATOR ACTIVE</span>
+      </div>
+      <div class="hud-pill">
+        <span>⚡</span>
+        <span id="stat-battery">94%</span>
+      </div>
+      <div class="hud-pill">
+        <span style="color: var(--accent);">FPS</span>
+        <span id="stat-fps">60</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Left Panel: Telemetry & Camera -->
+  <aside class="panel left-panel">
+    <div class="panel-header">
+      <span class="panel-title"><span>📡</span> TELEMETRY</span>
+      <span style="font-size: 10px; color: var(--green); font-family: 'JetBrains Mono';">12ms PING</span>
+    </div>
+    <div class="panel-body">
+      <div class="telemetry-grid">
+        <div class="telem-card">
+          <div class="telem-label">PITCH</div>
+          <div class="telem-val" id="telem-pitch">+0.0°</div>
+        </div>
+        <div class="telem-card">
+          <div class="telem-label">ROLL</div>
+          <div class="telem-val" id="telem-roll">+0.0°</div>
+        </div>
+        <div class="telem-card">
+          <div class="telem-label">YAW</div>
+          <div class="telem-val" id="telem-yaw">+0.0°</div>
+        </div>
+        <div class="telem-card">
+          <div class="telem-label">ALTITUDE</div>
+          <div class="telem-val" id="telem-alt">0.42 m</div>
+        </div>
+        <div class="telem-card">
+          <div class="telem-label">SPEED</div>
+          <div class="telem-val" id="telem-speed">0.0 m/s</div>
+        </div>
+        <div class="telem-card">
+          <div class="telem-label">MOTOR TEMP</div>
+          <div class="telem-val" id="telem-temp">36.5 °C</div>
+        </div>
+      </div>
+
+      <div class="section-label">CAMERA MODES</div>
+      <div class="btn-row">
+        <button class="btn-cam active" id="cam-orbit">🎥 Orbit Cam</button>
+        <button class="btn-cam" id="cam-chase">🏎️ Chase Cam</button>
+        <button class="btn-cam" id="cam-fpv">👁️ Robot FPV</button>
+        <button class="btn-cam" id="cam-top">📐 Top Down</button>
+      </div>
+
+      <div class="section-label" style="margin-top: 14px;">KEYBOARD CONTROLS</div>
+      <div style="font-size: 11px; color: var(--text-muted); line-height: 1.6; font-family: 'JetBrains Mono';">
+        <div><b style="color: var(--accent);">W / S</b> : Forward / Backward</div>
+        <div><b style="color: var(--accent);">A / D</b> : Turn Left / Right</div>
+        <div><b style="color: var(--accent);">Q / E</b> : Strafe Left / Right</div>
+        <div><b style="color: var(--accent);">SPACE</b> : Jump / Reset Pose</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Panel: Model & Action Presets -->
+  <aside class="panel right-panel">
+    <div class="panel-header">
+      <span class="panel-title"><span>⚡</span> ACTIONS &amp; MODEL</span>
+      <span id="anim-count" style="font-size: 10px; color: var(--accent); font-family: 'JetBrains Mono';">17 MOTIONS</span>
+    </div>
+    <div class="panel-body">
+      <div class="section-label" style="margin-top: 0;">SELECT 3D MODEL</div>
+      <select id="model-selector" class="model-select">
+        <option value="Go2Root.glb" selected>Unitree Go2 (Quadruped Stand)</option>
+        <option value="Go2JXRoot.glb">Unitree Go2 + Robotic Arm (JX)</option>
+        <option value="Go2.glb">Unitree Go2 (Compact Base)</option>
+        <option value="charge.glb">Unitree Charging Dock Station</option>
+        <option value="environment.glb">3D Terrain Environment</option>
+      </select>
+
+      <div class="section-label">MOTION PRESETS</div>
+      <div class="action-chips" id="action-chips-container">
+        <!-- Dynamically populated from gltf.animations -->
+      </div>
+
+      <div class="section-label">SIMULATION FEATURES</div>
+      <div class="toggle-row">
+        <span>💡 LED Headlights</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-headlights" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span>📡 3D LiDAR Point Cloud (111.pcd)</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-lidar">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span>🕸️ Wireframe Mode</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-wireframe">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span>🔊 Servo Audio Synth</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-sound" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span>🔄 Auto-Rotate Cam</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-autorotate">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Left Virtual Joystick -->
+  <div class="joystick-zone joystick-left" id="joystick-left">
+    <div class="joystick-knob" id="knob-left"></div>
+    <div class="joystick-label">MOVE / STRAFE</div>
+  </div>
+
+  <!-- Right Virtual Joystick -->
+  <div class="joystick-zone joystick-right" id="joystick-right">
+    <div class="joystick-knob" id="knob-right"></div>
+    <div class="joystick-label">TURN / LOOK</div>
+  </div>
+
+  <!-- Bottom Quick Action Bar -->
+  <nav class="bottom-bar">
+    <button class="action-btn primary" id="quick-stand">⚡ Stand Up</button>
+    <button class="action-btn" id="quick-sit">🪑 Sit Down</button>
+    <button class="action-btn" id="quick-hello">👋 Wave Hello</button>
+    <button class="action-btn" id="quick-dance">💃 Dance</button>
+    <button class="action-btn" id="quick-stretch">🧘 Stretch</button>
+    <button class="action-btn danger" id="quick-stop">⏹️ Stop</button>
+  </nav>
+
+  <!-- Main 3D Simulation Logic -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // App State
+    let scene, camera, renderer, controls;
+    let currentModel = null;
+    let mixer = null;
+    let actions = {};
+    let activeAction = null;
+    let lidarPoints = null;
+    let headlightLeft, headlightRight, headlightTarget;
+    let clock = new THREE.Clock();
+
+    // Audio Synth for Servos
+    let audioCtx = null;
+    let servoOsc = null;
+    let servoGain = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        servoOsc = audioCtx.createOscillator();
+        servoGain = audioCtx.createGain();
+        servoOsc.type = 'sawtooth';
+        servoOsc.frequency.setValueAtTime(140, audioCtx.currentTime);
+        servoGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        servoOsc.connect(servoGain);
+        servoGain.connect(audioCtx.destination);
+        servoOsc.start();
+      } catch (e) {
+        console.warn('AudioContext not allowed or not supported', e);
+      }
+    }
+
+    function playBeep(freq = 880, duration = 0.1) {
+      if (!audioCtx || !document.getElementById('toggle-sound').checked) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function setServoSound(intensity) {
+      if (!audioCtx || !document.getElementById('toggle-sound').checked) return;
+      if (servoGain && servoOsc) {
+        const targetGain = Math.min(0.05, intensity * 0.05);
+        servoGain.gain.setTargetAtTime(targetGain, audioCtx.currentTime, 0.05);
+        servoOsc.frequency.setTargetAtTime(120 + intensity * 80, audioCtx.currentTime, 0.05);
+      }
+    }
+
+    // Camera Modes
+    let cameraMode = 'orbit'; // 'orbit', 'chase', 'fpv', 'top'
+
+    // Movement Vectors
+    const robotVelocity = new THREE.Vector3();
+    let robotYaw = 0;
+    const moveInput = { x: 0, y: 0 };
+    const lookInput = { x: 0, y: 0 };
+    const keyState = {};
+
+    // Initialize 3D Scene
+    function init() {
+      const canvas = document.getElementById('webgl-canvas');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0d14);
+      scene.fog = new THREE.FogExp2(0x0a0d14, 0.025);
+
+      camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(2.4, 1.6, 2.8);
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+
+      // Orbit Controls
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.01; // Don't go below ground
+      controls.minDistance = 0.5;
+      controls.maxDistance = 25;
+      controls.target.set(0, 0.4, 0);
+
+      // Environment & Lights
+      setupLights();
+      setupFloorGrid();
+
+      // Load Default Model
+      loadModel('Go2Root.glb');
+
+      // Setup Listeners
+      setupEventListeners();
+      setupJoysticks();
+
+      // Load Point Cloud asynchronously
+      loadPointCloud('111.pcd');
+
+      animate();
+    }
+
+    // Lighting setup
+    function setupLights() {
+      // Ambient Soft Fill
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+
+      // Key Directional Sun Light with Shadows
+      const sunLight = new THREE.DirectionalLight(0xdff4ff, 2.0);
+      sunLight.position.set(5, 8, 5);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 25;
+      sunLight.shadow.camera.left = -4;
+      sunLight.shadow.camera.right = 4;
+      sunLight.shadow.camera.top = 4;
+      sunLight.shadow.camera.bottom = -4;
+      sunLight.shadow.bias = -0.0005;
+      scene.add(sunLight);
+
+      // Cyber Rim Light (Blue)
+      const rimLight1 = new THREE.DirectionalLight(0x00f0ff, 1.8);
+      rimLight1.position.set(-6, 4, -6);
+      scene.add(rimLight1);
+
+      // Warm Accent Fill (Amber)
+      const rimLight2 = new THREE.DirectionalLight(0xff8800, 1.0);
+      rimLight2.position.set(6, 2, -4);
+      scene.add(rimLight2);
+
+      // Headlight spotlights mounted on the robot
+      headlightTarget = new THREE.Object3D();
+      headlightTarget.position.set(0, 0.2, 3);
+      scene.add(headlightTarget);
+
+      headlightLeft = new THREE.SpotLight(0xffffff, 4.0, 12, Math.PI / 6, 0.4, 1.2);
+      headlightLeft.position.set(-0.12, 0.45, 0.35);
+      headlightLeft.target = headlightTarget;
+      headlightLeft.castShadow = true;
+      scene.add(headlightLeft);
+
+      headlightRight = new THREE.SpotLight(0xffffff, 4.0, 12, Math.PI / 6, 0.4, 1.2);
+      headlightRight.position.set(0.12, 0.45, 0.35);
+      headlightRight.target = headlightTarget;
+      headlightRight.castShadow = true;
+      scene.add(headlightRight);
+    }
+
+    // Floor Grid & Ground Shadow Receiver
+    function setupFloorGrid() {
+      // Infinite Grid Helper
+      const grid = new THREE.GridHelper(40, 40, 0x00f0ff, 0x192841);
+      grid.position.y = -0.001;
+      scene.add(grid);
+
+      // Subtle Ground Shadow Plane
+      const planeGeo = new THREE.PlaneGeometry(80, 80);
+      const planeMat = new THREE.ShadowMaterial({ opacity: 0.45 });
+      const groundPlane = new THREE.Mesh(planeGeo, planeMat);
+      groundPlane.rotation.x = -Math.PI / 2;
+      groundPlane.position.y = 0;
+      groundPlane.receiveShadow = true;
+      scene.add(groundPlane);
+
+      // Glowing Ground Ring / Platform
+      const ringGeo = new THREE.RingGeometry(1.4, 1.45, 64);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = -Math.PI / 2;
+      ringMesh.position.y = 0.002;
+      scene.add(ringMesh);
+    }
+
+    // Load GLTF / GLB Model
+    const gltfLoader = new GLTFLoader();
+
+    function loadModel(fileName) {
+      showLoading(true, 'LOADING 3D ASSETS', `Loading ${fileName}...`);
+
+      const modelPath = `/models/${fileName}`;
+      gltfLoader.load(
+        modelPath,
+        (gltf) => {
+          // Remove previous model
+          if (currentModel) {
+            scene.remove(currentModel);
+            if (mixer) mixer.stopAllAction();
+          }
+
+          currentModel = gltf.scene;
+          actions = {};
+
+          // Enable shadows and PBR tuning
+          currentModel.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.envMapIntensity = 1.0;
+                child.material.roughness = Math.max(child.material.roughness, 0.25);
+              }
+            }
+          });
+
+          // Calculate bounding box and center model
+          const box = new THREE.Box3().setFromObject(currentModel);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+
+          // Place feet on ground plane (y = 0)
+          currentModel.position.x = -center.x;
+          currentModel.position.z = -center.z;
+          currentModel.position.y = -box.min.y;
+
+          scene.add(currentModel);
+
+          // Setup Animations
+          mixer = new THREE.AnimationMixer(currentModel);
+          const animContainer = document.getElementById('action-chips-container');
+          animContainer.innerHTML = '';
+
+          const animList = gltf.animations || [];
+          document.getElementById('anim-count').innerText = `${animList.length} MOTIONS`;
+
+          if (animList.length > 0) {
+            animList.forEach((clip, index) => {
+              const action = mixer.clipAction(clip);
+              actions[clip.name] = action;
+
+              // Create Chip button
+              const chip = document.createElement('div');
+              chip.className = 'chip';
+              chip.innerHTML = `<span>▶</span> ${clip.name}`;
+              chip.addEventListener('click', () => {
+                initAudio();
+                playBeep(980, 0.08);
+                playAnimation(clip.name);
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+              });
+              animContainer.appendChild(chip);
+            });
+
+            // Default to first motion or 'StandUp' / 'Playing'
+            const defaultAnim = actions['StandUp'] ? 'StandUp' : (actions['Playing'] ? 'Playing' : animList[0].name);
+            playAnimation(defaultAnim);
+            const firstChip = animContainer.querySelector('.chip');
+            if (firstChip) firstChip.classList.add('active');
+          } else {
+            animContainer.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;">No baked animations in this model.</div>';
+          }
+
+          showLoading(false);
+          playBeep(660, 0.15);
+        },
+        (xhr) => {
+          if (xhr.lengthComputable) {
+            const percent = Math.round((xhr.loaded / xhr.total) * 100);
+            document.getElementById('loader-progress').innerText = `${percent}% Loaded (${fileName})`;
+          }
+        },
+        (error) => {
+          console.error('Error loading model:', error);
+          showLoading(false);
+          alert('Could not load model: ' + fileName);
+        }
+      );
+    }
+
+    // Play Animation with Crossfading
+    function playAnimation(name, duration = 0.3) {
+      const nextAction = actions[name];
+      if (!nextAction) return;
+
+      if (activeAction && activeAction !== nextAction) {
+        activeAction.fadeOut(duration);
+      }
+
+      nextAction.reset();
+      nextAction.fadeIn(duration);
+      nextAction.play();
+      activeAction = nextAction;
+    }
+
+    // Load LiDAR Point Cloud from 111.pcd
+    async function loadPointCloud(url) {
+      try {
+        const resp = await fetch(`/${url}`);
+        const text = await resp.text();
+        const lines = text.split('\n');
+        const dataIdx = lines.findIndex(l => l.startsWith('DATA ascii'));
+        if (dataIdx === -1) return;
+
+        const positions = [];
+        const colors = [];
+        const color = new THREE.Color();
+
+        for (let i = dataIdx + 1; i < lines.length; i++) {
+          const parts = lines[i].trim().split(/\s+/);
+          if (parts.length >= 3) {
+            const x = parseFloat(parts[0]);
+            const y = parseFloat(parts[1]);
+            const z = parseFloat(parts[2]);
+            const intensity = parts.length > 3 ? parseFloat(parts[3]) : 120;
+
+            positions.push(x, z, -y); // Convert coordinates to Three.js Y-up
+
+            // Color gradient based on intensity / height
+            const hue = THREE.MathUtils.mapLinear(intensity, 0, 255, 0.5, 0.85);
+            color.setHSL(hue, 1.0, 0.55);
+            colors.push(color.r, color.g, color.b);
+          }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+        const material = new THREE.PointsMaterial({
+          size: 0.04,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85
+        });
+
+        lidarPoints = new THREE.Points(geometry, material);
+        lidarPoints.visible = false;
+        scene.add(lidarPoints);
+      } catch (err) {
+        console.warn('Point cloud load error:', err);
+      }
+    }
+
+    // UI Event Listeners
+    function setupEventListeners() {
+      window.addEventListener('resize', onWindowResize);
+
+      // Model Switcher
+      document.getElementById('model-selector').addEventListener('change', (e) => {
+        initAudio();
+        loadModel(e.target.value);
+      });
+
+      // Camera Mode Buttons
+      const camBtns = {
+        'cam-orbit': 'orbit',
+        'cam-chase': 'chase',
+        'cam-fpv': 'fpv',
+        'cam-top': 'top'
+      };
+
+      Object.entries(camBtns).forEach(([btnId, mode]) => {
+        document.getElementById(btnId).addEventListener('click', () => {
+          initAudio();
+          playBeep(780, 0.08);
+          cameraMode = mode;
+          document.querySelectorAll('.btn-cam').forEach(b => b.classList.remove('active'));
+          document.getElementById(btnId).classList.add('active');
+          if (mode === 'orbit') {
+            controls.enabled = true;
+          } else {
+            controls.enabled = false;
+          }
+        });
+      });
+
+      // Quick Actions
+      document.getElementById('quick-stand').addEventListener('click', () => { initAudio(); playAnimation('StandUp'); });
+      document.getElementById('quick-sit').addEventListener('click', () => { initAudio(); playAnimation('Sit'); });
+      document.getElementById('quick-hello').addEventListener('click', () => { initAudio(); playAnimation('Hello'); });
+      document.getElementById('quick-dance').addEventListener('click', () => { initAudio(); playAnimation('Dance1'); });
+      document.getElementById('quick-stretch').addEventListener('click', () => { initAudio(); playAnimation('Stretch'); });
+      document.getElementById('quick-stop').addEventListener('click', () => {
+        if (activeAction) activeAction.stop();
+      });
+
+      // Feature Toggles
+      document.getElementById('toggle-headlights').addEventListener('change', (e) => {
+        initAudio();
+        headlightLeft.visible = e.target.checked;
+        headlightRight.visible = e.target.checked;
+      });
+
+      document.getElementById('toggle-lidar').addEventListener('change', (e) => {
+        initAudio();
+        if (lidarPoints) lidarPoints.visible = e.target.checked;
+      });
+
+      document.getElementById('toggle-wireframe').addEventListener('change', (e) => {
+        if (!currentModel) return;
+        currentModel.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.wireframe = e.target.checked;
+          }
+        });
+      });
+
+      document.getElementById('toggle-autorotate').addEventListener('change', (e) => {
+        controls.autoRotate = e.target.checked;
+        controls.autoRotateSpeed = 2.0;
+      });
+
+      // Keyboard Controls
+      window.addEventListener('keydown', (e) => {
+        initAudio();
+        keyState[e.code] = true;
+      });
+      window.addEventListener('keyup', (e) => {
+        keyState[e.code] = false;
+      });
+    }
+
+    // Virtual Joysticks Setup
+    function setupJoysticks() {
+      setupSingleJoystick('joystick-left', 'knob-left', (x, y) => {
+        moveInput.x = x;
+        moveInput.y = y;
+      });
+
+      setupSingleJoystick('joystick-right', 'knob-right', (x, y) => {
+        lookInput.x = x;
+        lookInput.y = y;
+      });
+    }
+
+    function setupSingleJoystick(zoneId, knobId, onChange) {
+      const zone = document.getElementById(zoneId);
+      const knob = document.getElementById(knobId);
+      const maxRadius = 45;
+      let active = false;
+      let startX = 0, startY = 0;
+
+      function handleStart(clientX, clientY) {
+        initAudio();
+        active = true;
+        const rect = zone.getBoundingClientRect();
+        startX = rect.left + rect.width / 2;
+        startY = rect.top + rect.height / 2;
+        handleMove(clientX, clientY);
+      }
+
+      function handleMove(clientX, clientY) {
+        if (!active) return;
+        let dx = clientX - startX;
+        let dy = clientY - startY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > maxRadius) {
+          dx = (dx / dist) * maxRadius;
+          dy = (dy / dist) * maxRadius;
+        }
+
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        onChange(dx / maxRadius, -dy / maxRadius);
+      }
+
+      function handleEnd() {
+        if (!active) return;
+        active = false;
+        knob.style.transform = `translate(0px, 0px)`;
+        onChange(0, 0);
+      }
+
+      // Pointer events for desktop & touch
+      zone.addEventListener('pointerdown', (e) => {
+        zone.setPointerCapture(e.pointerId);
+        handleStart(e.clientX, e.clientY);
+      });
+      zone.addEventListener('pointermove', (e) => handleMove(e.clientX, e.clientY));
+      zone.addEventListener('pointerup', handleEnd);
+      zone.addEventListener('pointercancel', handleEnd);
+    }
+
+    // Window Resize Handler
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Helper: Show/Hide Loading Screen
+    function showLoading(show, title, text) {
+      const overlay = document.getElementById('loading-overlay');
+      if (show) {
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+        if (title) document.getElementById('loader-title').innerText = title;
+        if (text) document.getElementById('loader-progress').innerText = text;
+      } else {
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 500);
+      }
+    }
+
+    // Main Animation & Physics Loop
+    let lastFpsUpdate = 0;
+    let frameCount = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.1);
+
+      // Process Keyboard & Joystick Movement
+      let forward = moveInput.y;
+      let strafe = moveInput.x;
+      let turn = lookInput.x;
+
+      if (keyState['KeyW'] || keyState['ArrowUp']) forward += 1;
+      if (keyState['KeyS'] || keyState['ArrowDown']) forward -= 1;
+      if (keyState['KeyA'] || keyState['ArrowLeft']) turn += 1;
+      if (keyState['KeyD'] || keyState['ArrowRight']) turn -= 1;
+      if (keyState['KeyQ']) strafe -= 1;
+      if (keyState['KeyE']) strafe += 1;
+
+      // Clamp movement inputs
+      forward = THREE.MathUtils.clamp(forward, -1, 1);
+      strafe = THREE.MathUtils.clamp(strafe, -1, 1);
+      turn = THREE.MathUtils.clamp(turn, -1, 1);
+
+      const isMoving = Math.abs(forward) > 0.05 || Math.abs(strafe) > 0.05 || Math.abs(turn) > 0.05;
+
+      // Audio Servo Sound
+      if (isMoving) {
+        setServoSound(Math.max(Math.abs(forward), Math.abs(turn), Math.abs(strafe)));
+        // Trigger walk animation if moving and not already walking
+        if (actions['CrossWalk'] && activeAction !== actions['CrossWalk'] && activeAction !== actions['SideWalk']) {
+          playAnimation('CrossWalk', 0.2);
+        }
+      } else {
+        setServoSound(0);
+      }
+
+      // Update Robot Position & Heading
+      if (currentModel) {
+        robotYaw += turn * 2.2 * delta;
+        currentModel.rotation.y = robotYaw;
+
+        const moveSpeed = 1.6;
+        const forwardVec = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), robotYaw);
+        const rightVec = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), robotYaw);
+
+        currentModel.position.addScaledVector(forwardVec, forward * moveSpeed * delta);
+        currentModel.position.addScaledVector(rightVec, strafe * moveSpeed * delta);
+
+        // Update Headlights position with robot
+        const headOffset = new THREE.Vector3(0, 0.45, 0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), robotYaw);
+        headlightLeft.position.copy(currentModel.position).add(headOffset).addScaledVector(rightVec, -0.12);
+        headlightRight.position.copy(currentModel.position).add(headOffset).addScaledVector(rightVec, 0.12);
+
+        headlightTarget.position.copy(currentModel.position).add(forwardVec.multiplyScalar(3.5));
+
+        // Update Telemetry HUD
+        document.getElementById('telem-pitch').innerText = `${(forward * 2.5).toFixed(1)}°`;
+        document.getElementById('telem-roll').innerText = `${(-strafe * 3.0).toFixed(1)}°`;
+        document.getElementById('telem-yaw').innerText = `${(THREE.MathUtils.radToDeg(robotYaw) % 360).toFixed(0)}°`;
+        const speedVal = isMoving ? Math.sqrt(forward * forward + strafe * strafe) * 1.6 : 0;
+        document.getElementById('telem-speed').innerText = `${speedVal.toFixed(1)} m/s`;
+
+        // Camera Modes
+        if (cameraMode === 'chase') {
+          const chaseCamPos = currentModel.position.clone()
+            .add(new THREE.Vector3(0, 0, -2.4).applyAxisAngle(new THREE.Vector3(0, 1, 0), robotYaw))
+            .add(new THREE.Vector3(0, 1.2, 0));
+          camera.position.lerp(chaseCamPos, 0.1);
+          camera.lookAt(currentModel.position.clone().add(new THREE.Vector3(0, 0.4, 0)));
+        } else if (cameraMode === 'fpv') {
+          const fpvPos = currentModel.position.clone()
+            .add(new THREE.Vector3(0, 0.45, 0.38).applyAxisAngle(new THREE.Vector3(0, 1, 0), robotYaw));
+          camera.position.copy(fpvPos);
+          const fpvTarget = fpvPos.clone().add(forwardVec.clone().multiplyScalar(4));
+          camera.lookAt(fpvTarget);
+        } else if (cameraMode === 'top') {
+          const topPos = currentModel.position.clone().add(new THREE.Vector3(0, 5, 0));
+          camera.position.lerp(topPos, 0.1);
+          camera.lookAt(currentModel.position);
+        } else {
+          controls.update();
+        }
+      }
+
+      // Update Animation Mixer
+      if (mixer) {
+        mixer.update(delta);
+      }
+
+      // FPS Counter
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsUpdate >= 1000) {
+        document.getElementById('stat-fps').innerText = frameCount;
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Start on DOM ready
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
